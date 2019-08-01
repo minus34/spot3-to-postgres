@@ -53,4 +53,3 @@ create materialized view public.spot3_lines as
 
 CREATE INDEX spot3_lines_geom_idx ON public.spot3_lines USING GIST (geom);
 ALTER MATERIALIZED VIEW public.spot3_lines CLUSTER ON spot3_lines_geom_idx;
-

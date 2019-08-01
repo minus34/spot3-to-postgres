@@ -136,10 +136,10 @@ if __name__ == '__main__':
 
     task_name = "Import SPOT3 data"
 
-    logger.info("{} started".format(task_name))
+    logger.info("{} - started".format(task_name))
 
     main()
 
     time_taken = datetime.datetime.now() - full_start_time
-    logger.info("{0} finished : {1}".format(task_name, time_taken))
+    logger.info("{} - finished : {}".format(task_name, time_taken))
 
