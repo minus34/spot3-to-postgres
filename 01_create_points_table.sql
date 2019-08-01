@@ -33,14 +33,16 @@ create materialized view public.spot3_lines as
     with lines as (
         select messengerid,
                messengername,
-               datetime,
-               lead(unixtime) over (partition by messengerid order by unixtime)  - unixtime as time_difference,
+               lead(datetime) over (partition by messengerid order by unixtime) as datetime,
+               lead(unixtime) over (partition by messengerid order by unixtime) as unixtime,
+               lead(unixtime) over (partition by messengerid order by unixtime) - unixtime as time_difference,
                st_distance(geom::geography, lead(geom::geography) over (partition by messengerid order by unixtime)) * 1.3 as distance_m,
                st_makeline(geom, lead(geom) over (partition by messengerid order by unixtime)) as geom
         from public.spot3_points
         where messagetype = 'UNLIMITED-TRACK'
     )
-    select messengerid,
+    select row_number() OVER () AS gid,
+           messengerid,
            messengername,
            datetime,
            time_difference,
@@ -49,6 +51,6 @@ create materialized view public.spot3_lines as
            geom
     from lines;
 
-ALTER TABLE public.spot3_lines ADD CONSTRAINT spot3_lines_pkey PRIMARY KEY (messengerId, dateTime);
 CREATE INDEX spot3_lines_geom_idx ON public.spot3_lines USING GIST (geom);
+ALTER MATERIALIZED VIEW public.spot3_lines CLUSTER ON spot3_lines_geom_idx;
 
