@@ -25,6 +25,7 @@ settings = dict()
 # postgres settings
 settings["pg_schema"] = "public"
 settings["pg_points_table"] = "spot3_points"
+settings["pg_lines_table"] = "spot3_lines"
 settings["pg_connect_string"] = "dbname=geo host=localhost port=5432 user=postgres password=password"
 
 # SPOT3 API
@@ -103,6 +104,12 @@ def insert_new_records(pg_cur, message_list):
                SET geom = ST_SetSRID(ST_MakepointM(longitude, latitude, unixTime), 4283)
                WHERE geom is null""".format(settings["pg_schema"], settings["pg_points_table"])
     pg_cur.execute(sql)
+
+    # update table stats
+    pg_cur.execute("ANALYSE {}.{}".format(settings["pg_schema"], settings["pg_points_table"]))
+
+    # refresh lines view
+    pg_cur.execute("refresh materialized view {}.{}".format(settings["pg_schema"], settings["pg_lines_table"]))
 
 
 if __name__ == '__main__':

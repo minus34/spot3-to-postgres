@@ -26,4 +26,29 @@ CREATE INDEX spot3_time_idx ON public.spot3_points USING btree (unixTime);
 CREATE INDEX spot3_points_geom_idx ON public.spot3_points USING GIST (geom);
 ALTER TABLE public.spot3_points CLUSTER ON spot3_points_geom_idx;
 
-alter table public.spot3_points add column  messageContent text
+
+-- create table of lines with speeds
+drop materialized view if exists public.spot3_lines;
+create materialized view public.spot3_lines as
+    with lines as (
+        select messengerid,
+               messengername,
+               datetime,
+               lead(unixtime) over (partition by messengerid order by unixtime)  - unixtime as time_difference,
+               st_distance(geom::geography, lead(geom::geography) over (partition by messengerid order by unixtime)) * 1.3 as distance_m,
+               st_makeline(geom, lead(geom) over (partition by messengerid order by unixtime)) as geom
+        from public.spot3_points
+        where messagetype = 'UNLIMITED-TRACK'
+    )
+    select messengerid,
+           messengername,
+           datetime,
+           time_difference,
+           distance_m::integer,
+           (distance_m / time_difference::float * 3.6)::numeric(4,1) as speed_kmh,
+           geom
+    from lines;
+
+ALTER TABLE public.spot3_lines ADD CONSTRAINT spot3_lines_pkey PRIMARY KEY (messengerId, dateTime);
+CREATE INDEX spot3_lines_geom_idx ON public.spot3_lines USING GIST (geom);
+
