@@ -22,15 +22,6 @@ from psycopg2.extensions import AsIs
 
 settings = dict()
 
-# where to save the current S3 file for debugging (if something goes pear shaped on import to postgres)
-settings["debug_file_path"] = '/Users/s57405/tmp/'
-
-# the path to this script - DO NOT EDIT
-settings["script_dir"] = os.path.dirname(os.path.realpath(__file__))
-
-# set postgres script director
-settings["sql_dir"] = os.path.join(settings["script_dir"], "postgres-scripts")
-
 # postgres settings
 settings["pg_schema"] = "public"
 settings["pg_points_table"] = "spot3_points"
@@ -62,33 +53,7 @@ def main():
         logger.fatal("Couldn't download SPOT3 JSON feed")
 
 
-# insert messages, one at a time
-def insert_new_records(pg_cur, message_list):
-
-    # for each message - only insert if new
-    for message_dict in message_list:
-        # remove unwanted value
-        message_dict.pop("@clientUnixTime", None)
-
-        # get column names and values for inserting
-        columns = message_dict.keys()
-        values = [message_dict[column] for column in columns]
-
-        # userv "UPSERT" to insert new data only
-        insert_statement = "INSERT INTO {}.{} (%s) VALUES %s ON CONFLICT (messengerId, unixTime) DO NOTHING" \
-            .format(settings["pg_schema"], settings["pg_points_table"])
-
-        pg_cur.execute(insert_statement, (AsIs(','.join(columns)), tuple(values)))
-        # print(pg_cur.mogrify(insert_statement, (AsIs(','.join(columns)), tuple(values))))
-
-    # add point geometries to table
-    sql = """UPDATE {}.{}
-               SET geom = ST_SetSRID(ST_MakepointM(longitude, latitude, unixTime), 4283)
-               WHERE geom is null""".format(settings["pg_schema"], settings["pg_points_table"])
-    pg_cur.execute(sql)
-
-
-# download XML file and parse it into XML ElementTree
+# download and parse JSON
 def get_json(url, encoding):
 
     try:
@@ -107,6 +72,36 @@ def get_json(url, encoding):
         except Exception as e:
             logger.fatal("Failed to parse JSON : {}".format(e))
             return None
+
+
+# insert messages, one at a time
+def insert_new_records(pg_cur, message_list):
+
+    rows_inserted = 0
+
+    # for each message - only insert if new
+    for message_dict in message_list:
+        # remove unwanted value
+        message_dict.pop("@clientUnixTime", None)
+
+        # get column names and values for inserting
+        columns = message_dict.keys()
+        values = [message_dict[column] for column in columns]
+
+        # use "UPSERT" to insert new data only
+        insert_statement = "INSERT INTO {}.{} (%s) VALUES %s ON CONFLICT (messengerId, unixTime) DO NOTHING" \
+            .format(settings["pg_schema"], settings["pg_points_table"])
+        pg_cur.execute(insert_statement, (AsIs(','.join(columns)), tuple(values)))
+
+        rows_inserted += pg_cur.rowcount
+
+    logger.info("{} new records inserted".format(rows_inserted))
+
+    # add point geometries to table
+    sql = """UPDATE {}.{}
+               SET geom = ST_SetSRID(ST_MakepointM(longitude, latitude, unixTime), 4283)
+               WHERE geom is null""".format(settings["pg_schema"], settings["pg_points_table"])
+    pg_cur.execute(sql)
 
 
 if __name__ == '__main__':
@@ -131,7 +126,7 @@ if __name__ == '__main__':
     # add the handler to the root logger
     logging.getLogger('').addHandler(console)
 
-    task_name = "import SPOT3 data"
+    task_name = "Import SPOT3 data"
 
     logger.info("{} started".format(task_name))
 
@@ -139,4 +134,4 @@ if __name__ == '__main__':
 
     time_taken = datetime.datetime.now() - full_start_time
     logger.info("{0} finished : {1}".format(task_name, time_taken))
-    logger.info("")
+
