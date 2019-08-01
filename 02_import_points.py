@@ -13,7 +13,7 @@ License:     Apache 2.0
 import datetime
 import json
 import os
-import psycopg2  # @2 - need to install psycopg2-binary package
+import psycopg2  # need to install psycopg2-binary package
 import psycopg2.extras
 import ssl
 import urllib.request
@@ -28,7 +28,7 @@ settings["pg_points_table"] = "spot3_points"
 settings["pg_connect_string"] = "dbname=geo host=localhost port=5432 user=postgres password=password"
 
 # SPOT3 API
-settings["api_url"] = "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/16eXyDLztlnvBYOYclTKcyfLas4rM2pvI/message?license=null&expiryDate=null&feedPassword=password"
+settings["api_url"] = "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/16eXyDLztlnvBYOYclTKcyfLas4rM2pvI/message?start=50&limit=500&license=null&expiryDate=null&feedPassword=password"
 settings["encoding"] = "utf-8"
 
 
@@ -81,19 +81,20 @@ def insert_new_records(pg_cur, message_list):
 
     # for each message - only insert if new
     for message_dict in message_list:
-        # remove unwanted value
-        message_dict.pop("@clientUnixTime", None)
+        if message_dict["unixTime"] > 1564616366:
+            # remove unwanted value
+            message_dict.pop("@clientUnixTime", None)
 
-        # get column names and values for inserting
-        columns = message_dict.keys()
-        values = [message_dict[column] for column in columns]
+            # get column names and values for inserting
+            columns = message_dict.keys()
+            values = [message_dict[column] for column in columns]
 
-        # use "UPSERT" to insert new data only
-        insert_statement = "INSERT INTO {}.{} (%s) VALUES %s ON CONFLICT (messengerId, unixTime) DO NOTHING" \
-            .format(settings["pg_schema"], settings["pg_points_table"])
-        pg_cur.execute(insert_statement, (AsIs(','.join(columns)), tuple(values)))
+            # use "UPSERT" to insert new data only
+            insert_statement = "INSERT INTO {}.{} (%s) VALUES %s ON CONFLICT (messengerId, unixTime) DO NOTHING" \
+                .format(settings["pg_schema"], settings["pg_points_table"])
+            pg_cur.execute(insert_statement, (AsIs(','.join(columns)), tuple(values)))
 
-        rows_inserted += pg_cur.rowcount
+            rows_inserted += pg_cur.rowcount
 
     logger.info("{} new records inserted".format(rows_inserted))
 
