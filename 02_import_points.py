@@ -29,7 +29,7 @@ settings["pg_lines_table"] = "spot3_lines"
 settings["pg_connect_string"] = "dbname=geo host=localhost port=5432 user=postgres password=password"
 
 # SPOT3 API
-settings["api_url"] = "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/16eXyDLztlnvBYOYclTKcyfLas4rM2pvI/message?start=50&limit=500&license=null&expiryDate=null&feedPassword=password"
+settings["api_url"] = "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/16eXyDLztlnvBYOYclTKcyfLas4rM2pvI/message?start=0&limit=500&license=null&expiryDate=null&feedPassword=password"
 settings["encoding"] = "utf-8"
 
 
