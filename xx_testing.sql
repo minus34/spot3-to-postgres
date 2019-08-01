@@ -5,6 +5,18 @@ order by unixtime;
 
 
 
-select *
+select *,
+       datetime + interval '10 hours'
 from public.spot3_lines
 order by datetime;
+
+
+
+-- daily totals and averages
+select date(datetime + interval '10 hours') as day,
+       (sum(distance_m)::float / 1000.0)::numeric(4, 1) as distance_km,
+       max(datetime) - min(datetime) as duration,
+       (sum(distance_m)::float / (max(unixtime) - min(unixtime))::float * 3.6)::numeric(3, 1) as average_speed_inc_breaks
+from public.spot3_lines
+where geom is not null
+group by day;

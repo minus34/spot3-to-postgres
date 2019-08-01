@@ -44,6 +44,7 @@ create materialized view public.spot3_lines as
     select row_number() OVER () AS gid,
            messengerid,
            messengername,
+           unixtime,
            datetime,
            time_difference,
            distance_m::integer,
