@@ -33,12 +33,13 @@ settings["sql_dir"] = os.path.join(settings["script_dir"], "postgres-scripts")
 
 # postgres settings
 settings["pg_schema"] = "public"
-settings["pg_points_table"] = "tag_reports"
+settings["pg_points_table"] = "spot3_points"
 settings["pg_connect_string"] = "dbname=geo host=localhost port=5432 user=postgres password=password"
 
 # SPOT3 API
 settings["api_url"] = "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/16eXyDLztlnvBYOYclTKcyfLas4rM2pvI/message?license=null&expiryDate=null&feedPassword=password"
 settings["encoding"] = "utf-8"
+
 
 def main():
     # connect to Postgres
@@ -54,46 +55,37 @@ def main():
 
     # download latest JSON
     message_list = get_json(settings["api_url"], settings["encoding"])
-    if message_list is None:
+    if message_list is not None:
+        # insert new records into postgres table
+        insert_new_records(pg_cur, message_list)
+    else:
         logger.fatal("Couldn't download SPOT3 JSON feed")
-
-    # insert new records into postgres table
 
 
 # insert messages, one at a time
-def parse_and_insert_new_records(pg_cur, root_elem):
+def insert_new_records(pg_cur, message_list):
 
-    # Step through XML and extract each message's data, then insert it into the database
-    try:
-        for i in root_elem.iter('messages'):
-            guid = get_xml_string(i, 'guid')
-            guid = guid.split("/")[-1]  # Take the id number out of the full guid to remove the unwanted URL
-            title = get_xml_string(i, 'title')
-            category = get_xml_string(i, 'category').upper()
-            link = get_xml_string(i, 'link')
-            description = get_xml_string(i, 'description')
+    # for each message - only insert if new
+    for message_dict in message_list:
+        # remove unwanted value
+        message_dict.pop("@clientUnixTime", None)
 
-            # add points to temp table
-            for pnt in i.iter('{http://www.georss.org/georss}point'):
-                xy_array = pnt.text.split()
-                x = xy_array[1]
-                y = xy_array[0]
-                wkt_point = ''.join(["ST_SetSRID(ST_MakePoint(", x, ",", y, "),4283)"])
+        # get column names and values for inserting
+        columns = message_dict.keys()
+        values = [message_dict[column] for column in columns]
 
+        # userv "UPSERT" to insert new data only
+        insert_statement = "INSERT INTO {}.{} (%s) VALUES %s ON CONFLICT (messengerId, unixTime) DO NOTHING" \
+            .format(settings["pg_schema"], settings["pg_points_table"])
 
-            # # for output_event in output_event_list:
-            # columns = event.keys()
-            # values = [event[column] for column in columns]
-            #
-            # insert_statement = "INSERT INTO {}.{} (%s) VALUES %s" \
-            #     .format(settings["pg_schema"], settings["pg_points_table"])
-            #
-            # pg_cur.execute(insert_statement, (AsIs(','.join(columns)), tuple(values)))
-            # # print(pg_cur.mogrify(insert_statement, (AsIs(','.join(columns)), tuple(values))))
+        pg_cur.execute(insert_statement, (AsIs(','.join(columns)), tuple(values)))
+        # print(pg_cur.mogrify(insert_statement, (AsIs(','.join(columns)), tuple(values))))
 
-    except:
-        logger.exception("Couldn't process XML data")
-        return False
+    # add point geometries to table
+    sql = """UPDATE {}.{}
+               SET geom = ST_SetSRID(ST_MakepointM(longitude, latitude, unixTime), 4283)
+               WHERE geom is null""".format(settings["pg_schema"], settings["pg_points_table"])
+    pg_cur.execute(sql)
 
 
 # download XML file and parse it into XML ElementTree
@@ -115,27 +107,6 @@ def get_json(url, encoding):
         except Exception as e:
             logger.fatal("Failed to parse JSON : {}".format(e))
             return None
-
-
-def get_xml_string(element, name, show_error=True):
-    try:
-        return element.find(name).text.strip()
-    except AttributeError:
-        if show_error:
-            logger.warning("XML missing element '{}'".format(name,))
-        return ""
-
-
-def check_if_new_record(pg_cur, messenger_id, unix_time):
-    # check if data already in postgres
-    sql = "SELECT EXISTS (SELECT 1 FROM {}.{} WHERE messengerId = '{}' AND unixTime = {} LIMIT 1)" \
-        .format(settings["pg_schema"], settings["pg_points_table"], messenger_id, unix_time)
-    pg_cur.execute(sql)
-
-    if pg_cur.fetchone()[0]:
-        return False
-    else:
-        return True
 
 
 if __name__ == '__main__':
