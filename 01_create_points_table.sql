@@ -36,7 +36,7 @@ create materialized view public.spot3_lines as
                lead(datetime) over (partition by messengerid order by unixtime) as datetime,
                lead(unixtime) over (partition by messengerid order by unixtime) as unixtime,
                lead(unixtime) over (partition by messengerid order by unixtime) - unixtime as time_difference,
-               st_distance(geom::geography, lead(geom::geography) over (partition by messengerid order by unixtime)) * 1.3 as distance_m,
+               st_distance(geom::geography, lead(geom::geography) over (partition by messengerid order by unixtime)) * 1.1 as distance_m,
                st_makeline(geom, lead(geom) over (partition by messengerid order by unixtime)) as geom
         from public.spot3_points
         where messagetype = 'UNLIMITED-TRACK'
