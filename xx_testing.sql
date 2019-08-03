@@ -6,7 +6,6 @@ select now() - datetime as time_since_record,
 from public.spot3_points
 order by unixtime desc;
 
-
 -- show lines between points
 select datetime + interval '10 hours' as local_time,
        *
@@ -22,7 +21,6 @@ from public.spot3_lines
 where geom is not null
 group by day
 order by day;
-
 
 -- check-ins
 select datetime + interval '10 hours' as local_time,
