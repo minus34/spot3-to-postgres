@@ -20,4 +20,13 @@ select date(datetime + interval '10 hours') as day,
        (sum(distance_m)::float / (max(unixtime) - min(unixtime))::float * 3.6)::numeric(3, 1) as average_speed_inc_breaks
 from public.spot3_lines
 where geom is not null
-group by day;
+group by day
+order by day;
+
+
+-- check-ins
+select datetime + interval '10 hours' as local_time,
+       *
+from public.spot3_points
+where messagetype = 'OK'
+order by datetime;
