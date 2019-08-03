@@ -1,16 +1,17 @@
 
-select *
+-- show points with time since last point
+select now() - datetime as time_since_record,
+       datetime + interval '10 hours' as local_time,
+       *
 from public.spot3_points
-order by unixtime;
+order by unixtime desc;
 
 
-
-select *,
-       datetime + interval '10 hours'
+-- show lines between points
+select datetime + interval '10 hours' as local_time,
+       *
 from public.spot3_lines
 order by datetime;
-
-
 
 -- daily totals and averages
 select date(datetime + interval '10 hours') as day,
